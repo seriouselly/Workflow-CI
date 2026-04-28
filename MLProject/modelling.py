@@ -1,7 +1,7 @@
 import pandas as pd
+import os
 import mlflow
 import dagshub
-import os
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.compose import ColumnTransformer
@@ -11,12 +11,13 @@ from sklearn.preprocessing import StandardScaler, OneHotEncoder
 dagshub_user = os.getenv("DAGSHUB_USERNAME")
 dagshub_token = os.getenv("DAGSHUB_TOKEN")
 
-# Set environment variables untuk dagshub authentication
+# Set environment variables untuk dagshub authentication SEBELUM init
 if dagshub_user and dagshub_token:
     os.environ['DAGSHUB_USER_NAME'] = dagshub_user
     os.environ['DAGSHUB_USER_TOKEN'] = dagshub_token
 
-dagshub.init(repo_owner='seriouselly', repo_name='Workflow-CI-V2', mlflow=True)
+# Initialize dagshub dengan fail_if_no_token=False untuk menghindari OAuth interaktif
+dagshub.init(repo_owner='seriouselly', repo_name='Workflow-CI-V2', mlflow=True, fail_if_no_token=False)
 
 df = pd.read_csv('../dataset_raw/StudentsPerformance.csv')
 X = df.drop(columns=['math score'])

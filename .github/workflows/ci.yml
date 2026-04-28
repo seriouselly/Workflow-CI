@@ -42,6 +42,19 @@ jobs:
           echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
           echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
 
+      - name: Verify Artifact Exists
+        run: |
+          cd MLProject
+          echo "Checking MLflow runs directory..."
+          ls -la mlruns/0/
+          if [ -d "mlruns/0/${{ env.RUN_ID }}/artifacts" ]; then
+            echo "✓ Artifacts found"
+            ls -la "mlruns/0/${{ env.RUN_ID }}/artifacts/"
+          else
+            echo "✗ Artifacts directory not found"
+            exit 1
+          fi
+
       - name: Upload Artefak Model ke GitHub
         uses: actions/upload-artifact@v4
         with:

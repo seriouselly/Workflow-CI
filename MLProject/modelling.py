@@ -10,6 +10,12 @@ from sklearn.preprocessing import StandardScaler, OneHotEncoder
 # Mengambil kredensial dari "kunci rahasia" GitHub (Secrets)
 dagshub_user = os.getenv("DAGSHUB_USERNAME")
 dagshub_token = os.getenv("DAGSHUB_TOKEN")
+
+# Set environment variables untuk dagshub authentication
+if dagshub_user and dagshub_token:
+    os.environ['DAGSHUB_USER_NAME'] = dagshub_user
+    os.environ['DAGSHUB_USER_TOKEN'] = dagshub_token
+
 dagshub.init(repo_owner='seriouselly', repo_name='Workflow-CI-V2', mlflow=True)
 
 df = pd.read_csv('../dataset_raw/StudentsPerformance.csv')

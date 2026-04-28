@@ -54,7 +54,6 @@ jobs:
           DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
         run: |
           cd MLProject
-          mlflow run . --env-manager=local
-
           mlflow models build-docker -m mlruns/0/${{ env.RUN_ID }}/artifacts/model -n prediksi-nilai-siswa:latest
+          
           docker tag prediksi-nilai-siswa:latest ${{ secrets.DOCKER_USERNAME }}/

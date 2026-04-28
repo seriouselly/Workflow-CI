@@ -33,8 +33,14 @@ jobs:
       - name: Dapatkan ID Eksperimen (Run ID) Terbaru
         id: get_run_id
         run: |
-          RUN_ID=$(ls -td mlruns/0/* | head -1 | awk -F/ '{print $3}')
+          cd MLProject
+          RUN_ID=$(find mlruns/0 -maxdepth 1 -type d -not -name '0' | sort -r | head -1 | xargs basename)
+          if [ -z "$RUN_ID" ]; then
+            echo "Error: No MLflow run found"
+            exit 1
+          fi
           echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
+          echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
 
       - name: Upload Artefak Model ke GitHub
         uses: actions/upload-artifact@v4
@@ -49,11 +55,8 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build dan Push Docker Image
-        env:
-          DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
-          DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
         run: |
           cd MLProject
           mlflow models build-docker -m mlruns/0/${{ env.RUN_ID }}/artifacts/model -n prediksi-nilai-siswa:latest
-          
-          docker tag prediksi-nilai-siswa:latest ${{ secrets.DOCKER_USERNAME }}/
+          docker tag prediksi-nilai-siswa:latest ${{ secrets.DOCKER_USERNAME }}/prediksi-nilai-siswa:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/prediksi-nilai-siswa:latest

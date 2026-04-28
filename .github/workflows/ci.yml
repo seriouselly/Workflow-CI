@@ -16,7 +16,7 @@ jobs:
       - name: Set up Python 3.12.7
         uses: actions/setup-python@v4
         with:
-          python-version: '3.12.7'
+          python-version: "3.12.7"
 
       - name: Install Dependencies
         run: |
@@ -28,7 +28,7 @@ jobs:
           DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
         run: |
           cd MLProject
-          mlflow run . --no-conda 
+          mlflow run . --no-conda
 
       - name: Dapatkan ID Eksperimen (Run ID) Terbaru
         id: get_run_id
@@ -54,6 +54,7 @@ jobs:
           DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
         run: |
           cd MLProject
-          mlflow models build-docker -m "models:/Prediksi_Nilai_Siswa/latest" -n ${{ secrets.DOCKER_USERNAME }}/ml-model-selly:latest
-          
-          docker push ${{ secrets.DOCKER_USERNAME }}/ml-model-selly:latest
+          mlflow run . --env-manager=local
+
+          mlflow models build-docker -m mlruns/0/${{ env.RUN_ID }}/artifacts/model -n prediksi-nilai-siswa:latest
+          docker tag prediksi-nilai-siswa:latest ${{ secrets.DOCKER_USERNAME }}/

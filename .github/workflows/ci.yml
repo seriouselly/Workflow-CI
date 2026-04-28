@@ -1,0 +1,59 @@
+name: Workflow CI MLflow
+
+on:
+  push:
+    branches:
+      - main # Robot akan bekerja setiap kali ada perubahan di branch main
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python 3.12.7
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12.7'
+
+      - name: Install Dependencies
+        run: |
+          pip install mlflow==2.19.0 pandas scikit-learn dagshub
+
+      - name: Run MLflow Project
+        env:
+          DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
+          DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+        run: |
+          cd MLProject
+          mlflow run . --no-conda 
+
+      - name: Dapatkan ID Eksperimen (Run ID) Terbaru
+        id: get_run_id
+        run: |
+          RUN_ID=$(ls -td mlruns/0/* | head -1 | awk -F/ '{print $3}')
+          echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
+
+      - name: Upload Artefak Model ke GitHub
+        uses: actions/upload-artifact@v3
+        with:
+          name: model-artifacts
+          path: MLProject/mlruns/
+
+      - name: Login ke Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build dan Push Docker Image
+        env:
+          DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
+          DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+        run: |
+          cd MLProject
+          mlflow models build-docker -m "models:/Prediksi_Nilai_Siswa/latest" -n ${{ secrets.DOCKER_USERNAME }}/ml-model-selly:latest
+          
+          docker push ${{ secrets.DOCKER_USERNAME }}/ml-model-selly:latest

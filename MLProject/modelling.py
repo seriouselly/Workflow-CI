@@ -1,7 +1,6 @@
 import pandas as pd
 import os
 import mlflow
-import dagshub
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.compose import ColumnTransformer
@@ -11,17 +10,15 @@ from sklearn.preprocessing import StandardScaler, OneHotEncoder
 dagshub_user = os.getenv("DAGSHUB_USERNAME")
 dagshub_token = os.getenv("DAGSHUB_TOKEN")
 
-# Set token secara langsung sebelum init
+# Set MLflow tracking URI dan credentials untuk DagShub
 if dagshub_user and dagshub_token:
-    dagshub.auth.set_token(dagshub_token)
+    mlflow_uri = f"https://dagshub.com/{dagshub_user}/Workflow-CI-V2/mlflow"
+    mlflow.set_tracking_uri(mlflow_uri)
+    os.environ['MLFLOW_TRACKING_USERNAME'] = dagshub_user
+    os.environ['MLFLOW_TRACKING_PASSWORD'] = dagshub_token
 
-# Initialize dagshub
-try:
-    dagshub.init(repo_owner='seriouselly', repo_name='Workflow-CI-V2', mlflow=True)
-except Exception as e:
-    print(f"Warning: DagShub initialization failed: {e}")
-    print("Continuing without DagShub integration...")
-
+# Set experiment
+mlflow.set_experiment("students-performance-prediction")
 
 df = pd.read_csv('../dataset_raw/StudentsPerformance.csv')
 X = df.drop(columns=['math score'])

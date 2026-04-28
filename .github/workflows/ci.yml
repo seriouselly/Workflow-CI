@@ -28,7 +28,7 @@ jobs:
           DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
         run: |
           cd MLProject
-          mlflow run . --no-conda
+          mlflow run . --env-manager=local
 
       - name: Dapatkan ID Eksperimen (Run ID) Terbaru
         id: get_run_id

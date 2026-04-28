@@ -1,6 +1,5 @@
 import pandas as pd
 import os
-import mlflow
 import joblib
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
@@ -32,23 +31,26 @@ X_test_processed = preprocessor.transform(X_test)
 # Buat folder untuk menyimpan model
 os.makedirs("models", exist_ok=True)
 
-with mlflow.start_run():
-    rf = RandomForestRegressor(n_estimators=50, random_state=42)
-    rf.fit(X_train_processed, y_train)
-    
-    # Log metrics
-    train_score = rf.score(X_train_processed, y_train)
-    test_score = rf.score(X_test_processed, y_test)
-    mlflow.log_metric("training_score", train_score)
-    mlflow.log_metric("test_score", test_score)
-    
-    # Save model manually ke file lokal
-    model_path = "models/model.pkl"
-    joblib.dump(rf, model_path)
-    
-    # Log artifacts
-    mlflow.log_artifacts("models")
-    
-    print(f"Model berhasil dilatih!")
-    print(f"Training score: {train_score:.4f}")
-    print(f"Test score: {test_score:.4f}")
+rf = RandomForestRegressor(n_estimators=50, random_state=42)
+rf.fit(X_train_processed, y_train)
+
+# Hitung metrics
+train_score = rf.score(X_train_processed, y_train)
+test_score = rf.score(X_test_processed, y_test)
+
+# Save model dan preprocessor
+model_path = "models/model.pkl"
+preprocessor_path = "models/preprocessor.pkl"
+
+joblib.dump(rf, model_path)
+joblib.dump(preprocessor, preprocessor_path)
+
+# Save metrics ke file
+with open("models/metrics.txt", "w") as f:
+    f.write(f"training_score: {train_score:.4f}\n")
+    f.write(f"test_score: {test_score:.4f}\n")
+
+print(f"Model berhasil dilatih!")
+print(f"Training score: {train_score:.4f}")
+print(f"Test score: {test_score:.4f}")
+print(f"Model saved to: {model_path}")

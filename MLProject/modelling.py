@@ -1,10 +1,17 @@
 import pandas as pd
 import os
 import mlflow
+from pathlib import Path
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
+
+# Set MLflow tracking URI ke folder mlruns di current directory
+current_dir = Path(__file__).parent
+mlflow_dir = current_dir / "mlruns"
+mlflow_dir.mkdir(exist_ok=True)
+mlflow.set_tracking_uri(f"file:{mlflow_dir.absolute()}")
 
 # MLflow akan menggunakan local tracking (mlruns/)
 # Credentials dari GitHub Secrets bisa digunakan untuk integrasi lanjutan jika diperlukan

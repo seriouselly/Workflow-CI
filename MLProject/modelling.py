@@ -12,7 +12,7 @@ dagshub_user = os.getenv("DAGSHUB_USERNAME")
 dagshub_token = os.getenv("DAGSHUB_TOKEN")
 dagshub.init(repo_owner='seriouselly', repo_name='Workflow-CI-V2', mlflow=True)
 
-df = pd.read_csv('dataset_raw/StudentsPerformance.csv')
+df = pd.read_csv('../dataset_raw/StudentsPerformance.csv')
 X = df.drop(columns=['math score'])
 y = df['math score']
 

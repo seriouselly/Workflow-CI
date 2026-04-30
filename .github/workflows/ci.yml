@@ -34,15 +34,38 @@ jobs:
           DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
           DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
 
+      - name: Run MLflow Project
+        env:
+          DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
+          DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+        run: |
+          cd MLProject
+          echo "Starting MLflow training..."
+          mlflow run . --env-manager=local
+          echo "MLflow training completed"
+
       - name: Dapatkan ID Eksperimen (Run ID) Terbaru
         id: get_run_id
         run: |
           cd MLProject
-          RUN_ID=$(find mlruns/0 -maxdepth 1 -type d -not -name '0' | sort -r | head -1 | xargs basename)
-          if [ -z "$RUN_ID" ]; then
-            echo "Error: No MLflow run found"
+          echo "Checking for mlruns/0 directory..."
+          if [ ! -d "mlruns/0" ]; then
+            echo "ERROR: mlruns/0 directory not found!"
+            echo "Available structure:"
+            find . -maxdepth 3 -type d -name "mlruns*" -o -type d -name "0" | head -20
             exit 1
           fi
+
+          echo "Contents of mlruns/0:"
+          ls -la mlruns/0/
+
+          RUN_ID=$(find mlruns/0 -maxdepth 1 -type d -not -name '0' | sort -r | head -1 | xargs -r basename)
+          if [ -z "$RUN_ID" ]; then
+            echo "Error: No MLflow run found in mlruns/0"
+            exit 1
+          fi
+
+          echo "Found RUN_ID: $RUN_ID"
           echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
           echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
 
@@ -106,6 +129,6 @@ jobs:
             fi
             exit 1
           }
-          
+
           docker tag prediksi-nilai-siswa:latest ${{ secrets.DOCKER_USERNAME }}/prediksi-nilai-siswa:latest
           docker push ${{ secrets.DOCKER_USERNAME }}/prediksi-nilai-siswa:latest

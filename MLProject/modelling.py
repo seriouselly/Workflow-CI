@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 import joblib
+import mlflow
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.compose import ColumnTransformer
@@ -54,3 +55,24 @@ print(f"Model berhasil dilatih!")
 print(f"Training score: {train_score:.4f}")
 print(f"Test score: {test_score:.4f}")
 print(f"Model saved to: {model_path}")
+
+# Log model dan metrics ke MLflow
+print("\n=== Logging to MLflow ===")
+with mlflow.start_run():
+    # Log parameters
+    mlflow.log_param("n_estimators", 50)
+    mlflow.log_param("random_state", 42)
+    mlflow.log_param("test_size", 0.2)
+    
+    # Log metrics
+    mlflow.log_metric("training_score", train_score)
+    mlflow.log_metric("test_score", test_score)
+    
+    # Log model dengan sklearn.log_model
+    mlflow.sklearn.log_model(rf, "model")
+    
+    # Log preprocessor sebagai artifact
+    mlflow.log_artifact(preprocessor_path, "model")
+    mlflow.log_artifact(model_path, "model")
+    
+    print("✓ Model logged to MLflow")

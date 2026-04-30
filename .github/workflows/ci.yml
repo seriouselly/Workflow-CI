@@ -43,45 +43,59 @@ jobs:
           echo "Starting MLflow training..."
           mlflow run . --env-manager=local
           echo "MLflow training completed"
+          echo ""
+          echo "=== Checking generated mlruns structure ==="
+          ls -la mlruns/0/ || echo "mlruns/0 not found"
 
       - name: Dapatkan ID Eksperimen (Run ID) Terbaru
         id: get_run_id
         run: |
           cd MLProject
-          echo "Checking for mlruns/0 directory..."
+          echo "=== Looking for RUN_ID in mlruns/0 ==="
           if [ ! -d "mlruns/0" ]; then
             echo "ERROR: mlruns/0 directory not found!"
             echo "Available structure:"
-            find . -maxdepth 3 -type d -name "mlruns*" -o -type d -name "0" | head -20
+            find . -maxdepth 3 -type d \( -name "mlruns*" -o -name "artifacts" \) 2>/dev/null | head -20
             exit 1
           fi
 
           echo "Contents of mlruns/0:"
           ls -la mlruns/0/
 
+          echo ""
+          echo "Looking for run directories..."
+          find mlruns/0 -maxdepth 1 -type d -not -name '0' | sort -r
+
           RUN_ID=$(find mlruns/0 -maxdepth 1 -type d -not -name '0' | sort -r | head -1 | xargs -r basename)
           if [ -z "$RUN_ID" ]; then
-            echo "Error: No MLflow run found in mlruns/0"
+            echo "ERROR: No MLflow run found in mlruns/0"
             exit 1
           fi
 
-          echo "Found RUN_ID: $RUN_ID"
+          echo ""
+          echo "✓ Found RUN_ID: $RUN_ID"
           echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
           echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
 
       - name: Verify Artifact Exists
         run: |
           cd MLProject
-          echo "Checking MLflow runs directory..."
-          ls -la mlruns/0/
-          if [ -d "mlruns/0/${{ env.RUN_ID }}/artifacts" ]; then
-            echo "✓ Artifacts found"
-            ls -la "mlruns/0/${{ env.RUN_ID }}/artifacts/"
-            echo "\n--- Contents of model directory ---"
-            find "mlruns/0/${{ env.RUN_ID }}/artifacts/model" -type f | head -20 || echo "Model directory may not exist yet"
+          echo "=== MLflow Run Directory Structure ==="
+          find mlruns/0/${{ env.RUN_ID }} -type f | sort
+
+          echo ""
+          echo "=== Artifacts Directory Contents ==="
+          ls -laR "mlruns/0/${{ env.RUN_ID }}/artifacts/" || echo "Artifacts not found"
+
+          echo ""
+          echo "=== Checking for model directory ==="
+          if [ -d "mlruns/0/${{ env.RUN_ID }}/artifacts/model" ]; then
+            echo "✓ Model directory found"
+            ls -laR "mlruns/0/${{ env.RUN_ID }}/artifacts/model/"
           else
-            echo "✗ Artifacts directory not found"
-            exit 1
+            echo "✗ Model directory NOT found"
+            echo "Available in artifacts:"
+            ls -la "mlruns/0/${{ env.RUN_ID }}/artifacts/"
           fi
 
       - name: Upload Artefak Model ke GitHub
@@ -90,7 +104,6 @@ jobs:
           name: model-artifacts
           path: MLProject/mlruns/
 
-      # TODO: Docker build diaktifkan setelah model training stabil
       - name: Login ke Docker Hub
         uses: docker/login-action@v3
         with:
@@ -108,27 +121,27 @@ jobs:
           echo "Model path: mlruns/0/${{ env.RUN_ID }}/artifacts/model"
           echo "Python Version: $PYTHON_VERSION"
 
+          # Debug: Show full artifact directory tree
+          echo ""
+          echo "=== Full artifacts directory tree ==="
+          find "mlruns/0/${{ env.RUN_ID }}/artifacts" -type f | sort
+
           # Debug: Check if model exists
+          echo ""
           if [ ! -d "mlruns/0/${{ env.RUN_ID }}/artifacts/model" ]; then
-            echo "ERROR: Model directory not found!"
+            echo "ERROR: Model directory not found at expected location!"
             echo "Available directories:"
             ls -la "mlruns/0/${{ env.RUN_ID }}/artifacts/"
             exit 1
           fi
 
+          echo "✓ Model directory exists"
+          ls -la "mlruns/0/${{ env.RUN_ID }}/artifacts/model/"
+
           # Check conda.yaml for Python version
+          echo ""
           echo "=== Checking conda.yaml ==="
           cat conda.yaml
 
-          echo "=== Starting Docker build ==="
-          mlflow models build-docker -m mlruns/0/${{ env.RUN_ID }}/artifacts/model -n prediksi-nilai-siswa:latest --enable-mlserver || {
-            echo "Docker build failed, checking Dockerfile..."
-            if [ -f Dockerfile ]; then
-              echo "=== Generated Dockerfile ===" 
-              head -30 Dockerfile
-            fi
-            exit 1
-          }
-
-          docker tag prediksi-nilai-siswa:latest ${{ secrets.DOCKER_USERNAME }}/prediksi-nilai-siswa:latest
+          echo ""
           docker push ${{ secrets.DOCKER_USERNAME }}/prediksi-nilai-siswa:latest

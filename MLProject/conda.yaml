@@ -2,10 +2,11 @@ name: env_prediksi
 channels:
   - conda-forge
 dependencies:
-  - python=3.12.7
+  - python=3.12
   - pip
   - pip:
-    - pandas
-    - scikit-learn
-    - mlflow==2.19.0
-    - dagshub
+      - pandas
+      - scikit-learn
+      - mlflow==2.19.0
+      - dagshub
+      - cloudpickle

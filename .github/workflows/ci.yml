@@ -25,13 +25,14 @@ jobs:
         run: |
           pip install mlflow==2.19.0 pandas scikit-learn dagshub cloudpickle
 
-      - name: Run MLflow Project
+      - name: Clean previous MLflow runs
+        run: |
+          cd MLProject
+          rm -rf mlruns/ .mlflow/ || true
+          echo "Cleaned old MLflow artifacts"
         env:
           DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
           DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
-        run: |
-          cd MLProject
-          mlflow run . --env-manager=local
 
       - name: Dapatkan ID Eksperimen (Run ID) Terbaru
         id: get_run_id
@@ -74,11 +75,15 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build dan Push Docker Image
+        env:
+          MLFLOW_DOCKER_ENV_MANAGER: local
+          PYTHON_VERSION: "3.12"
         run: |
           cd MLProject
           echo "=== Build Docker Image ==="
           echo "RUN_ID: ${{ env.RUN_ID }}"
           echo "Model path: mlruns/0/${{ env.RUN_ID }}/artifacts/model"
+          echo "Python Version: $PYTHON_VERSION"
 
           # Debug: Check if model exists
           if [ ! -d "mlruns/0/${{ env.RUN_ID }}/artifacts/model" ]; then
@@ -88,6 +93,19 @@ jobs:
             exit 1
           fi
 
-          mlflow models build-docker -m mlruns/0/${{ env.RUN_ID }}/artifacts/model -n prediksi-nilai-siswa:latest
+          # Check conda.yaml for Python version
+          echo "=== Checking conda.yaml ==="
+          cat conda.yaml
+
+          echo "=== Starting Docker build ==="
+          mlflow models build-docker -m mlruns/0/${{ env.RUN_ID }}/artifacts/model -n prediksi-nilai-siswa:latest --enable-mlserver || {
+            echo "Docker build failed, checking Dockerfile..."
+            if [ -f Dockerfile ]; then
+              echo "=== Generated Dockerfile ===" 
+              head -30 Dockerfile
+            fi
+            exit 1
+          }
+          
           docker tag prediksi-nilai-siswa:latest ${{ secrets.DOCKER_USERNAME }}/prediksi-nilai-siswa:latest
           docker push ${{ secrets.DOCKER_USERNAME }}/prediksi-nilai-siswa:latest

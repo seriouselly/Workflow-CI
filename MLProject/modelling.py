@@ -1,15 +1,19 @@
 import pandas as pd
 import os
 import joblib
-import mlflow
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
+import mlflow
+import mlflow.sklearn
 
-# Credentials dari GitHub Secrets bisa digunakan untuk integrasi lanjutan jika diperlukan
+# Credentials dari GitHub Secrets untuk DagsHub
 dagshub_user = os.getenv("DAGSHUB_USERNAME")
 dagshub_token = os.getenv("DAGSHUB_TOKEN")
+
+# Setup MLflow dengan local backend untuk menghindari permission error
+mlflow.set_tracking_uri("file:./mlruns")
 
 df = pd.read_csv('../dataset_raw/StudentsPerformance.csv')
 X = df.drop(columns=['math score'])
@@ -56,23 +60,27 @@ print(f"Training score: {train_score:.4f}")
 print(f"Test score: {test_score:.4f}")
 print(f"Model saved to: {model_path}")
 
-# Log model dan metrics ke MLflow
-print("\n=== Logging to MLflow ===")
-with mlflow.start_run():
-    # Log parameters
-    mlflow.log_param("n_estimators", 50)
-    mlflow.log_param("random_state", 42)
-    mlflow.log_param("test_size", 0.2)
-    
-    # Log metrics
-    mlflow.log_metric("training_score", train_score)
-    mlflow.log_metric("test_score", test_score)
-    
-    # Log model dengan sklearn.log_model
-    mlflow.sklearn.log_model(rf, "model")
-    
-    # Log preprocessor sebagai artifact
-    mlflow.log_artifact(preprocessor_path, "model")
-    mlflow.log_artifact(model_path, "model")
-    
-    print("✓ Model logged to MLflow")
+# Log model ke MLflow
+try:
+    print("=== Logging to MLflow ===")
+    with mlflow.start_run(run_name="RandomForest_Regressor"):
+        # Log parameters
+        mlflow.log_param("n_estimators", 50)
+        mlflow.log_param("random_state", 42)
+        
+        # Log metrics
+        mlflow.log_metric("training_score", train_score)
+        mlflow.log_metric("test_score", test_score)
+        
+        # Log model dengan input example
+        input_example = X_train_processed[:1]
+        mlflow.sklearn.log_model(
+            rf, 
+            "model",
+            input_example=input_example,
+            registered_model_name="StudentPerformanceRegressor"
+        )
+    print("✓ Model berhasil di-log ke MLflow")
+except Exception as e:
+    print(f"⚠ Warning: Gagal log ke MLflow - {str(e)}")
+    print("Model sudah tersimpan di disk")

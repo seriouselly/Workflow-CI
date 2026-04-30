@@ -18,9 +18,12 @@ jobs:
         with:
           python-version: "3.12.7"
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Install Dependencies
         run: |
-          pip install mlflow==2.19.0 pandas scikit-learn dagshub
+          pip install mlflow==2.19.0 pandas scikit-learn dagshub cloudpickle
 
       - name: Run MLflow Project
         env:
@@ -50,6 +53,8 @@ jobs:
           if [ -d "mlruns/0/${{ env.RUN_ID }}/artifacts" ]; then
             echo "✓ Artifacts found"
             ls -la "mlruns/0/${{ env.RUN_ID }}/artifacts/"
+            echo "\n--- Contents of model directory ---"
+            find "mlruns/0/${{ env.RUN_ID }}/artifacts/model" -type f | head -20 || echo "Model directory may not exist yet"
           else
             echo "✗ Artifacts directory not found"
             exit 1
@@ -71,6 +76,18 @@ jobs:
       - name: Build dan Push Docker Image
         run: |
           cd MLProject
+          echo "=== Build Docker Image ==="
+          echo "RUN_ID: ${{ env.RUN_ID }}"
+          echo "Model path: mlruns/0/${{ env.RUN_ID }}/artifacts/model"
+
+          # Debug: Check if model exists
+          if [ ! -d "mlruns/0/${{ env.RUN_ID }}/artifacts/model" ]; then
+            echo "ERROR: Model directory not found!"
+            echo "Available directories:"
+            ls -la "mlruns/0/${{ env.RUN_ID }}/artifacts/"
+            exit 1
+          fi
+
           mlflow models build-docker -m mlruns/0/${{ env.RUN_ID }}/artifacts/model -n prediksi-nilai-siswa:latest
           docker tag prediksi-nilai-siswa:latest ${{ secrets.DOCKER_USERNAME }}/prediksi-nilai-siswa:latest
           docker push ${{ secrets.DOCKER_USERNAME }}/prediksi-nilai-siswa:latest

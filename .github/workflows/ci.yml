@@ -18,21 +18,9 @@ jobs:
         with:
           python-version: "3.12.7"
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Install Dependencies
         run: |
-          pip install mlflow==2.19.0 pandas scikit-learn dagshub cloudpickle
-
-      - name: Clean previous MLflow runs
-        run: |
-          cd MLProject
-          rm -rf mlruns/ .mlflow/ || true
-          echo "Cleaned old MLflow artifacts"
-        env:
-          DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
-          DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+          pip install mlflow==2.19.0 pandas scikit-learn dagshub
 
       - name: Run MLflow Project
         env:
@@ -40,62 +28,31 @@ jobs:
           DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
         run: |
           cd MLProject
-          echo "Starting MLflow training..."
           mlflow run . --env-manager=local
-          echo "MLflow training completed"
-          echo ""
-          echo "=== Checking generated mlruns structure ==="
-          ls -la mlruns/0/ || echo "mlruns/0 not found"
 
       - name: Dapatkan ID Eksperimen (Run ID) Terbaru
         id: get_run_id
         run: |
           cd MLProject
-          echo "=== Looking for RUN_ID in mlruns/0 ==="
-          if [ ! -d "mlruns/0" ]; then
-            echo "ERROR: mlruns/0 directory not found!"
-            echo "Available structure:"
-            find . -maxdepth 3 -type d \( -name "mlruns*" -o -name "artifacts" \) 2>/dev/null | head -20
-            exit 1
-          fi
-
-          echo "Contents of mlruns/0:"
-          ls -la mlruns/0/
-
-          echo ""
-          echo "Looking for run directories..."
-          find mlruns/0 -maxdepth 1 -type d -not -name '0' | sort -r
-
-          RUN_ID=$(find mlruns/0 -maxdepth 1 -type d -not -name '0' | sort -r | head -1 | xargs -r basename)
+          RUN_ID=$(find mlruns/0 -maxdepth 1 -type d -not -name '0' | sort -r | head -1 | xargs basename)
           if [ -z "$RUN_ID" ]; then
-            echo "ERROR: No MLflow run found in mlruns/0"
+            echo "Error: No MLflow run found"
             exit 1
           fi
-
-          echo ""
-          echo "✓ Found RUN_ID: $RUN_ID"
           echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
           echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
 
       - name: Verify Artifact Exists
         run: |
           cd MLProject
-          echo "=== MLflow Run Directory Structure ==="
-          find mlruns/0/${{ env.RUN_ID }} -type f | sort
-
-          echo ""
-          echo "=== Artifacts Directory Contents ==="
-          ls -laR "mlruns/0/${{ env.RUN_ID }}/artifacts/" || echo "Artifacts not found"
-
-          echo ""
-          echo "=== Checking for model directory ==="
-          if [ -d "mlruns/0/${{ env.RUN_ID }}/artifacts/model" ]; then
-            echo "✓ Model directory found"
-            ls -laR "mlruns/0/${{ env.RUN_ID }}/artifacts/model/"
-          else
-            echo "✗ Model directory NOT found"
-            echo "Available in artifacts:"
+          echo "Checking MLflow runs directory..."
+          ls -la mlruns/0/
+          if [ -d "mlruns/0/${{ env.RUN_ID }}/artifacts" ]; then
+            echo "✓ Artifacts found"
             ls -la "mlruns/0/${{ env.RUN_ID }}/artifacts/"
+          else
+            echo "✗ Artifacts directory not found"
+            exit 1
           fi
 
       - name: Upload Artefak Model ke GitHub
@@ -104,87 +61,9 @@ jobs:
           name: model-artifacts
           path: MLProject/mlruns/
 
-      - name: Login ke Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Check Docker Status
-        run: |
-          echo "=== Docker Version ==="
-          docker --version
-
-          echo ""
-          echo "=== Docker Daemon Status ==="
-          docker info | head -20
-
-          echo ""
-          echo "=== Clean up old images ==="
-          docker rmi -f prediksi-nilai-siswa:latest 2>/dev/null || echo "No previous image to remove"
-          docker images | grep prediksi-nilai-siswa || echo "No prediksi-nilai-siswa images found"
-
       - name: Build dan Push Docker Image
-        env:
-          MLFLOW_DOCKER_ENV_MANAGER: local
-          PYTHON_VERSION: "3.12"
         run: |
           cd MLProject
-          echo "=== Build Docker Image ==="
-          echo "RUN_ID: ${{ env.RUN_ID }}"
-          echo "Model path: mlruns/0/${{ env.RUN_ID }}/artifacts/model"
-          echo "Python Version: $PYTHON_VERSION"
-
-          # Debug: Show full artifact directory tree
-          echo ""
-          echo "=== Full artifacts directory tree ==="
-          find "mlruns/0/${{ env.RUN_ID }}/artifacts" -type f | sort
-
-          # Debug: Check if model exists
-          echo ""
-          if [ ! -d "mlruns/0/${{ env.RUN_ID }}/artifacts/model" ]; then
-            echo "ERROR: Model directory not found at expected location!"
-            echo "Available directories:"
-            ls -la "mlruns/0/${{ env.RUN_ID }}/artifacts/"
-            exit 1
-          fi
-
-          echo "✓ Model directory exists"
-          ls -la "mlruns/0/${{ env.RUN_ID }}/artifacts/model/"
-
-          # Check conda.yaml for Python version
-          echo ""
-          echo "=== Checking conda.yaml ==="
-          cat conda.yaml
-
-          echo ""
-          echo "=== Starting Docker build ==="
-
-          # Build Docker image
-          mlflow models build-docker \
-            -m mlruns/0/${{ env.RUN_ID }}/artifacts/model \
-            -n prediksi-nilai-siswa:latest \
-            --enable-mlserver
-
-          if [ $? -ne 0 ]; then
-            echo "ERROR: Docker build failed!"
-            if [ -f Dockerfile ]; then
-              echo ""
-              echo "=== Generated Dockerfile ===" 
-              head -40 Dockerfile
-            fi
-            exit 1
-          fi
-
-          echo ""
-          echo "=== Verifying Docker image was created ==="
-          docker images | grep prediksi-nilai-siswa || {
-            echo "ERROR: Docker image not found after build!"
-            docker images
-            exit 1
-          }
-
-          echo ""
-          echo "=== Tagging and pushing Docker image ==="
+          mlflow models build-docker -m mlruns/0/${{ env.RUN_ID }}/artifacts/model -n prediksi-nilai-siswa:latest
           docker tag prediksi-nilai-siswa:latest ${{ secrets.DOCKER_USERNAME }}/prediksi-nilai-siswa:latest
           docker push ${{ secrets.DOCKER_USERNAME }}/prediksi-nilai-siswa:latest

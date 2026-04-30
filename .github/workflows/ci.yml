@@ -110,6 +110,20 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      - name: Check Docker Status
+        run: |
+          echo "=== Docker Version ==="
+          docker --version
+
+          echo ""
+          echo "=== Docker Daemon Status ==="
+          docker info | head -20
+
+          echo ""
+          echo "=== Clean up old images ==="
+          docker rmi -f prediksi-nilai-siswa:latest 2>/dev/null || echo "No previous image to remove"
+          docker images | grep prediksi-nilai-siswa || echo "No prediksi-nilai-siswa images found"
+
       - name: Build dan Push Docker Image
         env:
           MLFLOW_DOCKER_ENV_MANAGER: local
@@ -144,4 +158,33 @@ jobs:
           cat conda.yaml
 
           echo ""
+          echo "=== Starting Docker build ==="
+
+          # Build Docker image
+          mlflow models build-docker \
+            -m mlruns/0/${{ env.RUN_ID }}/artifacts/model \
+            -n prediksi-nilai-siswa:latest \
+            --enable-mlserver
+
+          if [ $? -ne 0 ]; then
+            echo "ERROR: Docker build failed!"
+            if [ -f Dockerfile ]; then
+              echo ""
+              echo "=== Generated Dockerfile ===" 
+              head -40 Dockerfile
+            fi
+            exit 1
+          fi
+
+          echo ""
+          echo "=== Verifying Docker image was created ==="
+          docker images | grep prediksi-nilai-siswa || {
+            echo "ERROR: Docker image not found after build!"
+            docker images
+            exit 1
+          }
+
+          echo ""
+          echo "=== Tagging and pushing Docker image ==="
+          docker tag prediksi-nilai-siswa:latest ${{ secrets.DOCKER_USERNAME }}/prediksi-nilai-siswa:latest
           docker push ${{ secrets.DOCKER_USERNAME }}/prediksi-nilai-siswa:latest
